@@ -1,221 +1,221 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Image as ImageIcon, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Search, User, Book, ChevronRight, GraduationCap } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
+
+type Profile = {
+    id: string;
+    display_name: string | null;
+    email: string;
+};
 
 type Material = {
     id: string;
     name: string;
-    image: string | null; // Base64 string
+    image: string | null;
 };
 
-export default function MaterialsPage() {
+export default function SearchPage() {
+    const [query, setQuery] = useState("");
+    const [searchType, setSearchType] = useState<"user" | "material" | null>(null);
+    const [users, setUsers] = useState<Profile[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [isAdding, setIsAdding] = useState(false);
-    const [newName, setNewName] = useState("");
-    const [newImage, setNewImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [loading, setLoading] = useState(false);
+    const supabase = createClient();
+
+    const handleSearch = async (type: "user" | "material", searchQuery: string) => {
+        setLoading(true);
+        if (type === "user") {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, display_name, email') // Assuming email is accessible or just display_name
+                .ilike('display_name', `%${searchQuery}%`)
+                .limit(20);
+            if (data) setUsers(data as Profile[]);
+        } else if (type === "material") {
+            const { data } = await supabase
+                .from('materials')
+                .select('*')
+                .ilike('name', `%${searchQuery}%`)
+                .limit(20);
+            if (data) setMaterials(data);
+        }
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const saved = localStorage.getItem("study_materials");
-        if (saved) {
-            setMaterials(JSON.parse(saved));
+        if (searchType && query) {
+            const timer = setTimeout(() => {
+                handleSearch(searchType, query);
+            }, 500);
+            return () => clearTimeout(timer);
+        } else if (searchType && !query) {
+            // Fetch initial data if needed, or clear
+            if (searchType === "user") setUsers([]);
+            if (searchType === "material") setMaterials([]);
         }
-        setIsLoaded(true);
-    }, []);
-
-    useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem("study_materials", JSON.stringify(materials));
-        }
-    }, [materials, isLoaded]);
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement("canvas");
-                    const MAX_WIDTH = 300;
-                    const MAX_HEIGHT = 300;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext("2d");
-                    ctx?.drawImage(img, 0, 0, width, height);
-
-                    // Compress to JPEG with 0.7 quality
-                    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-                    setNewImage(dataUrl);
-                };
-                img.src = event.target?.result as string;
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const addMaterial = () => {
-        if (!newName.trim()) return;
-        const newMaterial: Material = {
-            id: Math.random().toString(36).substr(2, 9),
-            name: newName,
-            image: newImage,
-        };
-        setMaterials([...materials, newMaterial]);
-        setNewName("");
-        setNewImage(null);
-        setIsAdding(false);
-    };
-
-    const deleteMaterial = (id: string) => {
-        setMaterials(materials.filter((m) => m.id !== id));
-    };
+    }, [query, searchType]);
 
     return (
-        <div className="h-full w-full p-4 md:p-8 overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-8">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-2">
-                        <h1 className="text-3xl font-light text-gray-900">教材管理</h1>
-                        <p className="text-gray-500">使用する教材を登録・編集します。</p>
-                    </div>
-                    <button
-                        onClick={() => setIsAdding(true)}
-                        className="px-4 py-2 bg-black text-white rounded-xl shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
-                    >
-                        <Plus size={20} />
-                        <span className="hidden md:inline">教材を追加</span>
-                    </button>
+        <div className="h-full w-full bg-white overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-4 py-6 md:px-8">
+                <h1 className="text-lg font-bold text-gray-900 mb-6">さがす</h1>
+
+                {/* Search Bar */}
+                <div className="relative mb-8">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="検索"
+                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-black transition-colors"
+                    />
                 </div>
 
-                {/* Add Modal / Form */}
-                <AnimatePresence>
-                    {isAdding && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 overflow-hidden"
+                {/* Navigation Buttons */}
+                {!searchType && !query && (
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <button
+                            onClick={() => setSearchType("user")}
+                            className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors shadow-sm"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-lg font-medium">新しい教材</h3>
-                                <button onClick={() => setIsAdding(false)} className="text-gray-400 hover:text-gray-600">
-                                    <X size={20} />
-                                </button>
-                            </div>
+                            <User size={32} className="text-gray-700 mb-2" />
+                            <span className="font-bold text-gray-900 text-sm">ユーザー</span>
+                            <span className="text-xs text-gray-400 mt-1">友達を探す</span>
+                        </button>
+                        <button
+                            onClick={() => setSearchType("material")}
+                            className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors shadow-sm"
+                        >
+                            <Book size={32} className="text-gray-700 mb-2" />
+                            <span className="font-bold text-gray-900 text-sm">教材</span>
+                            <span className="text-xs text-gray-400 mt-1">教材を探す</span>
+                        </button>
+                    </div>
+                )}
 
+                {/* Tabs (Visual only for now) */}
+                {!searchType && !query && (
+                    <div className="flex items-center space-x-4 mb-8 overflow-x-auto pb-2">
+                        <button className="px-4 py-1.5 bg-gray-100 text-gray-900 rounded-full text-sm font-bold whitespace-nowrap">すべて</button>
+                        <button className="px-4 py-1.5 text-gray-500 hover:bg-gray-50 rounded-full text-sm font-bold whitespace-nowrap">記事</button>
+                        <button className="px-4 py-1.5 text-gray-500 hover:bg-gray-50 rounded-full text-sm font-bold whitespace-nowrap">傾向と対策</button>
+                        <button className="px-4 py-1.5 text-gray-500 hover:bg-gray-50 rounded-full text-sm font-bold whitespace-nowrap">ユーザー</button>
+                    </div>
+                )}
+
+                {/* Search Results */}
+                {(searchType || query) && (
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-bold text-gray-900">
+                                {searchType === "user" ? "ユーザー検索" : searchType === "material" ? "教材検索" : "検索結果"}
+                            </h2>
+                            <button onClick={() => { setSearchType(null); setQuery(""); }} className="text-sm text-gray-500 hover:text-black">
+                                クリア
+                            </button>
+                        </div>
+
+                        {loading ? (
+                            <div className="text-center py-8 text-gray-500">検索中...</div>
+                        ) : (
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">教材名</label>
-                                    <input
-                                        type="text"
-                                        value={newName}
-                                        onChange={(e) => setNewName(e.target.value)}
-                                        placeholder="例: チャート式 数学II+B"
-                                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:outline-none focus:border-black transition-colors"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">表紙画像</label>
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-full h-32 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors relative overflow-hidden"
-                                    >
-                                        {newImage ? (
-                                            <img src={newImage} alt="Preview" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="text-center text-gray-400">
-                                                <ImageIcon size={24} className="mx-auto mb-2" />
-                                                <span className="text-xs">クリックして画像を選択</span>
-                                            </div>
-                                        )}
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageUpload}
-                                            className="hidden"
-                                        />
+                                {searchType === "user" && users.map(user => (
+                                    <div key={user.id} className="flex items-center space-x-4 p-3 border border-gray-100 rounded-xl hover:bg-gray-50">
+                                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                                            <User size={20} className="text-gray-500" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">{user.display_name || "ゲスト"}</p>
+                                            <p className="text-xs text-gray-500">ID: {user.id.slice(0, 8)}...</p>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <button
-                                        onClick={() => setIsAdding(false)}
-                                        className="px-4 py-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
-                                    >
-                                        キャンセル
-                                    </button>
-                                    <button
-                                        onClick={addMaterial}
-                                        className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                                    >
-                                        追加する
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Materials Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {materials.map((material) => (
-                        <motion.div
-                            key={material.id}
-                            layout
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 group relative aspect-[3/4] flex flex-col"
-                        >
-                            <div className="flex-1 bg-gray-50 rounded-xl mb-3 overflow-hidden relative">
-                                {material.image ? (
-                                    <img src={material.image} alt={material.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                        <ImageIcon size={32} />
+                                ))}
+                                {searchType === "material" && materials.map(material => (
+                                    <div key={material.id} className="flex items-center space-x-4 p-3 border border-gray-100 rounded-xl hover:bg-gray-50">
+                                        <div className="w-10 h-14 bg-gray-100 rounded flex items-center justify-center overflow-hidden border border-gray-200">
+                                            {material.image ? (
+                                                <img src={material.image} alt={material.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Book size={20} className="text-gray-300" />
+                                            )}
+                                        </div>
+                                        <p className="font-bold text-gray-900">{material.name}</p>
+                                    </div>
+                                ))}
+                                {((searchType === "user" && users.length === 0) || (searchType === "material" && materials.length === 0)) && (
+                                    <div className="text-center py-8 text-gray-400">
+                                        {query ? "見つかりませんでした" : "検索ワードを入力してください"}
                                     </div>
                                 )}
                             </div>
-                            <h3 className="font-medium text-gray-900 text-center text-sm line-clamp-2">{material.name}</h3>
+                        )}
+                    </div>
+                )}
 
-                            <button
-                                onClick={() => deleteMaterial(material.id)}
-                                className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-50"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </motion.div>
-                    ))}
+                {/* Articles Section (Static) */}
+                {!searchType && !query && (
+                    <div>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="font-bold text-lg text-gray-900">記事</h2>
+                            <button className="text-xs text-gray-500 hover:text-black">もっと見る</button>
+                        </div>
 
-                    {/* Add Button Placeholder */}
-                    <button
-                        onClick={() => setIsAdding(true)}
-                        className="aspect-[3/4] rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-gray-300 hover:bg-gray-50 transition-all"
-                    >
-                        <Plus size={32} className="mb-2" />
-                        <span className="text-sm font-medium">追加</span>
-                    </button>
-                </div>
+                        <div className="space-y-6">
+                            {/* Article 1 */}
+                            <div className="flex gap-4 group cursor-pointer">
+                                <div className="w-24 h-24 bg-gray-200 rounded-xl flex-shrink-0 overflow-hidden">
+                                    <img src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=300&h=300&fit=crop" alt="Article" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                        知っておきたい！ 「奨学金制度」で広がる未来
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-xs text-gray-500">#PR</span>
+                                        <span className="text-xs text-gray-500">#進路選び</span>
+                                        <span className="text-xs text-gray-500">#教育資金</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Article 2 */}
+                            <div className="flex gap-4 group cursor-pointer">
+                                <div className="w-24 h-24 bg-gray-200 rounded-xl flex-shrink-0 overflow-hidden">
+                                    <img src="https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?w=300&h=300&fit=crop" alt="Article" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                        今年も開催します！ 「カロリーメイト マンスリー没頭チャレンジ ～誰もう、すべてを栄養にして。～」
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-xs text-gray-500">#PR</span>
+                                        <span className="text-xs text-gray-500">#カロリーメイト</span>
+                                        <span className="text-xs text-gray-500">#受験生応援</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Article 3 */}
+                            <div className="flex gap-4 group cursor-pointer">
+                                <div className="w-24 h-24 bg-gray-200 rounded-xl flex-shrink-0 overflow-hidden">
+                                    <img src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=300&h=300&fit=crop" alt="Article" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                                        ＜九州・沖縄エリア＞地方試験会場 成蹊大学
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-xs text-gray-500">#PR</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

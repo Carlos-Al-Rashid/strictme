@@ -18,11 +18,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={clsx(inter.className, "antialiased h-screen w-screen overflow-hidden bg-gray-50 text-black flex")}>
-        <Sidebar />
-        <main className="flex-1 h-full overflow-hidden relative">
-          {children}
-        </main>
+      <body className={`${inter.className} antialiased bg-gray-50`}>
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto pb-16 md:pb-0 md:ml-64">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

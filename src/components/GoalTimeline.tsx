@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { createClient } from "@/lib/supabase/client";
 
 type Goal = {
     id: string;
@@ -13,22 +14,68 @@ type Goal = {
 };
 
 export default function GoalTimeline({ readOnly = false }: { readOnly?: boolean }) {
-    const [goals, setGoals] = useState<Goal[]>([
-        { id: "1", title: "定期試験", date: "2025-12-20", description: "数学Bと物理に集中" },
-        { id: "2", title: "駿台模試", date: "2026-01-15", description: "全国ランキング目標: 上位10%" },
-    ]);
+    const [goals, setGoals] = useState<Goal[]>([]);
     const [isAdding, setIsAdding] = useState(false);
     const [newGoal, setNewGoal] = useState({ title: "", date: "", description: "" });
+    const supabase = createClient();
 
-    const addGoal = () => {
-        if (!newGoal.title || !newGoal.date) return;
-        setGoals([...goals, { id: Math.random().toString(), ...newGoal }].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        setNewGoal({ title: "", date: "", description: "" });
-        setIsAdding(false);
+    useEffect(() => {
+        fetchGoals();
+    }, []);
+
+    const fetchGoals = async () => {
+        const { data, error } = await supabase
+            .from('goals')
+            .select('*')
+            .order('date', { ascending: true });
+
+        if (data && !error) {
+            setGoals(data);
+        }
     };
 
-    const deleteGoal = (id: string) => {
-        setGoals(goals.filter((g) => g.id !== id));
+    const addGoal = async () => {
+        if (!newGoal.title || !newGoal.date) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            alert("ログインが必要です");
+            return;
+        }
+
+        const { error } = await supabase
+            .from('goals')
+            .insert([
+                {
+                    user_id: user.id,
+                    title: newGoal.title,
+                    date: newGoal.date,
+                    description: newGoal.description,
+                }
+            ]);
+
+        if (error) {
+            alert("目標の追加に失敗しました: " + error.message);
+            return;
+        }
+
+        setNewGoal({ title: "", date: "", description: "" });
+        setIsAdding(false);
+        fetchGoals();
+    };
+
+    const deleteGoal = async (id: string) => {
+        const { error } = await supabase
+            .from('goals')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            alert("目標の削除に失敗しました: " + error.message);
+            return;
+        }
+
+        fetchGoals();
     };
 
     return (

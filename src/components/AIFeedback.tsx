@@ -2,28 +2,54 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AIFeedback() {
-    const [feedback, setFeedback] = useState<string>("監視システム初期化中...");
+    const [feedback, setFeedback] = useState<string>("学習状況を分析中...");
     const [loading, setLoading] = useState(true);
+    const supabase = createClient();
 
     useEffect(() => {
         const fetchFeedback = async () => {
             try {
-                // Get recent study records
-                const savedRecords = localStorage.getItem("study_records");
-                let context = "現在の学習状況に基づいて、簡潔なフィードバックをください。";
+                // Fetch all user data from Supabase
+                const { data: records } = await supabase
+                    .from('study_records')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
 
-                if (savedRecords) {
-                    const records = JSON.parse(savedRecords).slice(0, 5); // Last 5 records
-                    if (records.length > 0) {
-                        const recordsStr = records.map((r: any) =>
-                            `- ${r.date}: ${r.subject} (${Math.floor(r.duration / 60)}時間${r.duration % 60}分) メモ: ${r.notes}`
-                        ).join("\n");
-                        context += `\n\n直近の学習記録:\n${recordsStr}`;
-                    } else {
-                        context += "\n(まだ学習記録がありません)";
-                    }
+                const { data: materials } = await supabase
+                    .from('materials')
+                    .select('*');
+
+                const { data: goals } = await supabase
+                    .from('goals')
+                    .select('*')
+                    .order('date', { ascending: true });
+
+                // Build comprehensive context
+                let context = "あなたは学習管理アプリのAIアシスタントです。ユーザーの学習状況をもとに、1〜2行で簡潔かつ具体的なアドバイスや励ましの言葉を提供してください。";
+
+                if (goals && goals.length > 0) {
+                    const goalsStr = goals.map(g =>
+                        `${g.date}: ${g.title} - ${g.description || ''}`
+                    ).join('\n');
+                    context += `\n\n【目標】\n${goalsStr}`;
+                }
+
+                if (records && records.length > 0) {
+                    const recordsStr = records.map(r =>
+                        `${r.date}: ${r.subject} (${r.duration}分) - ${r.notes || ''}`
+                    ).join('\n');
+                    context += `\n\n【最近の学習記録】\n${recordsStr}`;
+                } else {
+                    context += "\n\n【最近の学習記録】\nまだ学習記録がありません";
+                }
+
+                if (materials && materials.length > 0) {
+                    const materialsStr = materials.map(m => m.name).join(', ');
+                    context += `\n\n【登録教材】\n${materialsStr}`;
                 }
 
                 const res = await fetch("/api/chat", {
@@ -35,13 +61,14 @@ export default function AIFeedback() {
                         ]
                     }),
                 });
+
                 const data = await res.json();
                 if (data.message) {
                     setFeedback(data.message);
                 }
             } catch (error) {
                 console.error("Failed to fetch feedback", error);
-                setFeedback("中央知能への接続に失敗しました。");
+                setFeedback("フィードバックの取得に失敗しました。");
             } finally {
                 setLoading(false);
             }
@@ -51,23 +78,21 @@ export default function AIFeedback() {
     }, []);
 
     return (
-        <div className="h-full w-full flex flex-col items-center justify-center relative overflow-hidden bg-white">
-            {/* Background Elements */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-100 via-white to-white opacity-50" />
-
+        <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-8">
             <motion.div
-                key={feedback}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="z-10 text-center max-w-2xl px-6"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="max-w-2xl w-full"
             >
-                <h2 className="text-sm font-medium text-gray-400 mb-4 tracking-widest uppercase">
-                    AI 観測
-                </h2>
-                <p className="text-3xl md:text-4xl font-light text-gray-800 leading-tight">
-                    "{feedback}"
-                </p>
+                {feedback ? (
+                    <p className="text-2xl md:text-3xl font-light text-gray-800 leading-tight text-center">
+                        "{feedback}"
+                    </p>
+                ) : (
+                    <p className="text-xl text-gray-600 text-center">
+                        フィードバックを生成中...
+                    </p>
+                )}
             </motion.div>
         </div>
     );

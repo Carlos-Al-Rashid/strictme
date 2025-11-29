@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { BookOpen, Clock } from "lucide-react";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 
 type StudyRecord = {
     id: string;
@@ -18,27 +19,38 @@ export default function DailyRecordList() {
     const [todaysRecords, setTodaysRecords] = useState<StudyRecord[]>([]);
     const [totalTime, setTotalTime] = useState(0);
     const [materials, setMaterials] = useState<{ id: string, name: string, image: string | null }[]>([]);
+    const supabase = createClient();
 
     useEffect(() => {
-        const savedRecords = localStorage.getItem("study_records");
-        if (savedRecords) {
-            const allRecords: StudyRecord[] = JSON.parse(savedRecords);
-            const todayStr = format(new Date(), "yyyy年MM月dd日");
-            const todayISO = format(new Date(), "yyyy-MM-dd");
+        fetchTodaysRecords();
+        fetchMaterials();
+    }, []);
 
-            const today = allRecords.filter(r =>
-                r.date.startsWith(todayStr) || r.date.startsWith(todayISO)
-            );
+    const fetchTodaysRecords = async () => {
+        const todayStr = format(new Date(), "yyyy年MM月dd日");
 
+        const { data, error } = await supabase
+            .from('study_records')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (data && !error) {
+            // Filter for today's records
+            const today = data.filter(r => r.date.startsWith(todayStr));
             setTodaysRecords(today);
             setTotalTime(today.reduce((acc, curr) => acc + curr.duration, 0));
         }
+    };
 
-        const savedMaterials = localStorage.getItem("study_materials");
-        if (savedMaterials) {
-            setMaterials(JSON.parse(savedMaterials));
+    const fetchMaterials = async () => {
+        const { data, error } = await supabase
+            .from('materials')
+            .select('*');
+
+        if (data && !error) {
+            setMaterials(data);
         }
-    }, []);
+    };
 
     const getMaterialImage = (subjectName: string) => {
         const matched = materials.find(m => m.name.trim() === subjectName.trim());
