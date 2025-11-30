@@ -88,7 +88,6 @@ export default function Dashboard({
             const [
                 { data: followsData },
                 { data: recordsData },
-                { data: commentsData },
                 { data: goalsData },
             ] = await Promise.all([
                 supabase
@@ -101,15 +100,10 @@ export default function Dashboard({
                     .order('created_at', { ascending: false })
                     .limit(50),
                 supabase
-                    .from('comments')
-                    .select('*')
-                    .order('created_at', { ascending: true })
-                    .limit(500),
-                supabase
                     .from('goals')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(100),
+                    .limit(20),
             ]);
 
             const followingUserIds = followsData?.map(f => f.following_id) || [];
@@ -117,7 +111,9 @@ export default function Dashboard({
 
             if (recordsData) {
                 const materialNames = [...new Set(recordsData.map(r => r.subject))];
-                const userIds = [...new Set(recordsData.map(r => r.user_id))];
+                const recordUserIds = [...new Set(recordsData.map(r => r.user_id))];
+                const goalUserIds = [...new Set((goalsData || []).map(g => g.user_id))];
+                const allUserIds = [...new Set([...recordUserIds, ...goalUserIds])];
 
                 const [materialsRes, profilesRes] = await Promise.all([
                     materialNames.length
@@ -126,11 +122,11 @@ export default function Dashboard({
                             .select('name, image')
                             .in('name', materialNames)
                         : Promise.resolve({ data: [] }),
-                    userIds.length
+                    allUserIds.length
                         ? supabase
                             .from('profiles')
                             .select('id, display_name, avatar_url')
-                            .in('id', userIds)
+                            .in('id', allUserIds)
                         : Promise.resolve({ data: [] }),
                 ]);
 
@@ -154,43 +150,13 @@ export default function Dashboard({
                 setAllRecords(enrichedRecords);
                 setRecords(enrichedRecords);
 
-                if (commentsData) {
-                    const commentsByRecord: { [key: string]: Comment[] } = {};
-                    commentsData.forEach(comment => {
-                        if (!commentsByRecord[comment.record_id]) {
-                            commentsByRecord[comment.record_id] = [];
-                        }
-                        commentsByRecord[comment.record_id].push(comment);
-                    });
-                    setComments(commentsByRecord);
-                }
-            }
-
-            if (goalsData && goalsData.length) {
-                const goalUserIds = [...new Set(goalsData.map(g => g.user_id))];
-                const { data: goalProfilesData } = goalUserIds.length
-                    ? await supabase
-                        .from('profiles')
-                        .select('id, display_name, avatar_url')
-                        .in('id', goalUserIds)
-                    : { data: [] };
-
-                const goalUserNameMap = new Map(
-                    goalProfilesData?.map(p => [p.id, p.display_name]) || []
-                );
-                const goalUserAvatarMap = new Map(
-                    goalProfilesData?.map(p => [p.id, p.avatar_url]) || []
-                );
-
-                const enrichedGoals = goalsData.map(goal => ({
+                const enrichedGoals = (goalsData || []).map(goal => ({
                     ...goal,
-                    user_display_name: goalUserNameMap.get(goal.user_id) || null,
-                    user_avatar_url: goalUserAvatarMap.get(goal.user_id) || null
+                    user_display_name: userNameMap.get(goal.user_id) || null,
+                    user_avatar_url: userAvatarMap.get(goal.user_id) || null
                 }));
 
                 setGoals(enrichedGoals);
-            } else {
-                setGoals([]);
             }
 
             setLoading(false);

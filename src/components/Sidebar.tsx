@@ -10,7 +10,6 @@ import {
     Search,
     MoreHorizontal,
     Award,
-    Menu,
     X,
     User
 } from "lucide-react";
@@ -28,6 +27,7 @@ const navItems = [
 export default function Sidebar() {
     const pathname = usePathname();
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const supabase = createClient();
 
@@ -35,15 +35,20 @@ export default function Sidebar() {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                // Fetch profile display name
+                // Fetch profile display name and avatar
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('display_name')
+                    .select('display_name, avatar_url')
                     .eq('id', user.id)
                     .single();
 
-                if (profile && profile.display_name) {
-                    setUserEmail(profile.display_name);
+                if (profile) {
+                    if (profile.display_name) {
+                        setUserEmail(profile.display_name);
+                    } else {
+                        setUserEmail(user.email || null);
+                    }
+                    setAvatarUrl(profile.avatar_url);
                 } else {
                     setUserEmail(user.email || null);
                 }
@@ -97,19 +102,6 @@ export default function Sidebar() {
 
     return (
         <>
-            {/* Mobile Toggle Button */}
-            <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="メニューを開く"
-                className={clsx(
-                    "md:hidden fixed top-4 left-4 z-40 rounded-full bg-white shadow-lg border border-gray-200 p-2 transition-colors",
-                    mobileMenuOpen && "pointer-events-none opacity-0"
-                )}
-            >
-                <Menu size={20} className="text-gray-700" />
-            </button>
-
             {/* Desktop Sidebar */}
             <motion.div
                 initial={{ x: -100, opacity: 0 }}
@@ -119,7 +111,11 @@ export default function Sidebar() {
                 {/* Profile Section */}
                 <Link href="/profile" className="px-6 mb-8 flex items-center space-x-3 w-full hover:bg-gray-50 py-2 rounded-xl transition-colors">
                     <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
-                        <User className="text-gray-500" size={24} />
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <User className="text-gray-500" size={24} />
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900 truncate">
@@ -154,8 +150,12 @@ export default function Sidebar() {
                         >
                             <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
                                 <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <User className="text-gray-500" size={20} />
+                                    <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                                        {avatarUrl ? (
+                                            <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User className="text-gray-500" size={20} />
+                                        )}
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-sm font-bold text-gray-900">

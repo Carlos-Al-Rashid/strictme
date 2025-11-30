@@ -1,6 +1,11 @@
 import Dashboard, { DashboardInitialData, StudyRecord, Comment, Goal } from "@/components/Dashboard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "タイムライン",
+};
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -9,10 +14,10 @@ async function buildDashboardInitialData(
   userId: string,
   userEmail: string | null,
 ): Promise<DashboardInitialData> {
+  // First batch: Get basic data
   const [
     { data: followsData },
     { data: recordsData },
-    { data: commentsData },
     { data: goalsData },
   ] = await Promise.all([
     supabase
@@ -25,29 +30,27 @@ async function buildDashboardInitialData(
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
-      .from("comments")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .limit(500),
-    supabase
       .from("goals")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(20),
   ]);
 
   const followingIds = followsData?.map((f) => f.following_id) || [];
   const records = recordsData ?? [];
 
   const materialNames = [...new Set(records.map((r) => r.subject))];
-  const userIds = [...new Set(records.map((r) => r.user_id))];
+  const recordUserIds = [...new Set(records.map((r) => r.user_id))];
+  const goalUserIds = [...new Set((goalsData || []).map((g) => g.user_id))];
+  const allUserIds = [...new Set([...recordUserIds, ...goalUserIds])];
 
+  // Second batch: Get enrichment data (materials and profiles) in parallel
   const [materialsRes, profilesRes] = await Promise.all([
     materialNames.length
       ? supabase.from("materials").select("name, image").in("name", materialNames)
       : Promise.resolve({ data: [] }),
-    userIds.length
-      ? supabase.from("profiles").select("id, display_name, avatar_url").in("id", userIds)
+    allUserIds.length
+      ? supabase.from("profiles").select("id, display_name, avatar_url").in("id", allUserIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -56,7 +59,7 @@ async function buildDashboardInitialData(
   );
   const userNameMap = new Map(
     (profilesRes.data as { id: string; display_name: string | null }[] | null)?.map((p) => [p.id, p.display_name]) ||
-      [],
+    [],
   );
   const userAvatarMap = new Map(
     (profilesRes.data as { id: string; avatar_url: string | null }[] | null)?.map((p) => [p.id, p.avatar_url]) || [],
@@ -69,37 +72,18 @@ async function buildDashboardInitialData(
     user_avatar_url: userAvatarMap.get(record.user_id) || null,
   }));
 
-  const commentsMap: { [key: string]: Comment[] } = {};
-  commentsData?.forEach((comment) => {
-    if (!commentsMap[comment.record_id]) {
-      commentsMap[comment.record_id] = [];
-    }
-    commentsMap[comment.record_id].push(comment);
-  });
-
-  let enrichedGoals: Goal[] = [];
-  if (goalsData && goalsData.length) {
-    const goalUserIds = [...new Set(goalsData.map((g) => g.user_id))];
-    const { data: goalProfilesData } = goalUserIds.length
-      ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", goalUserIds)
-      : { data: [] };
-
-    const goalUserNameMap = new Map(goalProfilesData?.map((p) => [p.id, p.display_name]) || []);
-    const goalUserAvatarMap = new Map(goalProfilesData?.map((p) => [p.id, p.avatar_url]) || []);
-
-    enrichedGoals = goalsData.map((goal) => ({
-      ...goal,
-      user_display_name: goalUserNameMap.get(goal.user_id) || null,
-      user_avatar_url: goalUserAvatarMap.get(goal.user_id) || null,
-    }));
-  }
+  const enrichedGoals: Goal[] = (goalsData || []).map((goal) => ({
+    ...goal,
+    user_display_name: userNameMap.get(goal.user_id) || null,
+    user_avatar_url: userAvatarMap.get(goal.user_id) || null,
+  }));
 
   return {
     userEmail,
     currentUserId: userId,
     followingIds,
     records: enrichedRecords,
-    comments: commentsMap,
+    comments: {},
     goals: enrichedGoals,
   };
 }

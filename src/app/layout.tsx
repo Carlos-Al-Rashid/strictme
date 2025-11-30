@@ -7,8 +7,11 @@ import Sidebar from "@/components/Sidebar";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Strict Me",
-  description: "AI-powered study management",
+  title: {
+    default: "Studyplus",
+    template: "%s | Studyplus"
+  },
+  description: "学習管理アプリ",
 };
 
 export default function RootLayout({
