@@ -14,7 +14,7 @@ async function buildDashboardInitialData(
   userId: string,
   userEmail: string | null,
 ): Promise<DashboardInitialData> {
-  // First batch: Get basic data
+  // First batch: Get basic data with joins
   const [
     { data: followsData },
     { data: recordsData },
@@ -26,12 +26,12 @@ async function buildDashboardInitialData(
       .eq("follower_id", userId),
     supabase
       .from("study_records")
-      .select("*")
+      .select("*, profiles(display_name, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
       .from("goals")
-      .select("*")
+      .select("*, profiles(display_name, avatar_url)")
       .order("created_at", { ascending: false })
       .limit(20),
   ]);
@@ -40,42 +40,27 @@ async function buildDashboardInitialData(
   const records = recordsData ?? [];
 
   const materialNames = [...new Set(records.map((r) => r.subject))];
-  const recordUserIds = [...new Set(records.map((r) => r.user_id))];
-  const goalUserIds = [...new Set((goalsData || []).map((g) => g.user_id))];
-  const allUserIds = [...new Set([...recordUserIds, ...goalUserIds])];
 
-  // Second batch: Get enrichment data (materials and profiles) in parallel
-  const [materialsRes, profilesRes] = await Promise.all([
-    materialNames.length
-      ? supabase.from("materials").select("name, image").in("name", materialNames)
-      : Promise.resolve({ data: [] }),
-    allUserIds.length
-      ? supabase.from("profiles").select("id, display_name, avatar_url").in("id", allUserIds)
-      : Promise.resolve({ data: [] }),
-  ]);
+  // Second batch: Get enrichment data (materials only)
+  const { data: materialsData } = materialNames.length
+    ? await supabase.from("materials").select("name, image").in("name", materialNames)
+    : { data: [] };
 
   const materialImageMap = new Map(
-    (materialsRes.data as { name: string; image: string | null }[] | null)?.map((m) => [m.name, m.image]) || [],
-  );
-  const userNameMap = new Map(
-    (profilesRes.data as { id: string; display_name: string | null }[] | null)?.map((p) => [p.id, p.display_name]) ||
-    [],
-  );
-  const userAvatarMap = new Map(
-    (profilesRes.data as { id: string; avatar_url: string | null }[] | null)?.map((p) => [p.id, p.avatar_url]) || [],
+    (materialsData as { name: string; image: string | null }[] | null)?.map((m) => [m.name, m.image]) || [],
   );
 
-  const enrichedRecords: StudyRecord[] = records.map((record) => ({
+  const enrichedRecords: StudyRecord[] = records.map((record: any) => ({
     ...record,
     material_image: materialImageMap.get(record.subject) || null,
-    user_display_name: userNameMap.get(record.user_id) || null,
-    user_avatar_url: userAvatarMap.get(record.user_id) || null,
+    user_display_name: record.profiles?.display_name || null,
+    user_avatar_url: record.profiles?.avatar_url || null,
   }));
 
-  const enrichedGoals: Goal[] = (goalsData || []).map((goal) => ({
+  const enrichedGoals: Goal[] = (goalsData || []).map((goal: any) => ({
     ...goal,
-    user_display_name: userNameMap.get(goal.user_id) || null,
-    user_avatar_url: userAvatarMap.get(goal.user_id) || null,
+    user_display_name: goal.profiles?.display_name || null,
+    user_avatar_url: goal.profiles?.avatar_url || null,
   }));
 
   return {

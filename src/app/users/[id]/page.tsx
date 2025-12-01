@@ -28,31 +28,31 @@ export default function UserProfilePage() {
     }, [userId]);
 
     const fetchUserProfile = async () => {
-        // Fetch user profile
-        const { data: profileData } = await supabase
-            .from('profiles')
-            .select('id, display_name, bio, avatar_url')
-            .eq('id', userId)
-            .maybeSingle();
+        const [
+            { data: profileData },
+            { count: followersCount },
+            { count: followingsCount }
+        ] = await Promise.all([
+            supabase
+                .from('profiles')
+                .select('id, display_name, bio, avatar_url')
+                .eq('id', userId)
+                .maybeSingle(),
+            supabase
+                .from('follows')
+                .select('*', { count: 'exact', head: true })
+                .eq('following_id', userId),
+            supabase
+                .from('follows')
+                .select('*', { count: 'exact', head: true })
+                .eq('follower_id', userId)
+        ]);
 
         if (profileData) {
             setProfile(profileData);
         }
 
-        // Fetch follower count
-        const { count: followersCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('following_id', userId);
-
         setFollowerCount(followersCount || 0);
-
-        // Fetch following count
-        const { count: followingsCount } = await supabase
-            .from('follows')
-            .select('*', { count: 'exact', head: true })
-            .eq('follower_id', userId);
-
         setFollowingCount(followingsCount || 0);
 
         setLoading(false);
