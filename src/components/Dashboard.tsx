@@ -95,12 +95,12 @@ export default function Dashboard({
                     .select('following_id')
                     .eq('follower_id', user.id),
                 supabase
-                    .from('study_records_with_details')
+                    .from('study_records')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(50),
                 supabase
-                    .from('goals_with_details')
+                    .from('goals')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(20),
@@ -110,15 +110,12 @@ export default function Dashboard({
             setFollowingIds(followingUserIds);
 
             if (recordsData) {
-                // View returns data already enriched, just cast to StudyRecord
-                const enrichedRecords = recordsData as StudyRecord[];
-                setAllRecords(enrichedRecords);
-                setRecords(enrichedRecords);
+                setAllRecords(recordsData as StudyRecord[]);
+                setRecords(recordsData as StudyRecord[]);
             }
 
             if (goalsData) {
-                const enrichedGoals = goalsData as Goal[];
-                setGoals(enrichedGoals);
+                setGoals(goalsData as Goal[]);
             }
 
             setLoading(false);
