@@ -12,6 +12,10 @@ export const metadata: Metadata = {
     template: "%s | Studyplus"
   },
   description: "学習管理アプリ",
+  icons: {
+    icon: '/icon.jpg',
+    apple: '/icon.jpg',
+  },
 };
 
 export default function RootLayout({
