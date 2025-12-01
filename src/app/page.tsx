@@ -48,21 +48,23 @@ async function buildDashboardInitialData(
   const [materialsRes, profilesRes] = await Promise.all([
     materialNames.length
       ? supabase.from("materials").select("name, image").in("name", materialNames)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
     allUserIds.length
       ? supabase.from("profiles").select("id, display_name, avatar_url").in("id", allUserIds)
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
+  const materialsData = materialsRes.data || [];
+  const profilesData = profilesRes.data || [];
+
   const materialImageMap = new Map(
-    (materialsRes.data as { name: string; image: string | null }[] | null)?.map((m) => [m.name, m.image]) || [],
+    (materialsData as { name: string; image: string | null }[]).map((m) => [m.name, m.image])
   );
   const userNameMap = new Map(
-    (profilesRes.data as { id: string; display_name: string | null }[] | null)?.map((p) => [p.id, p.display_name]) ||
-    [],
+    (profilesData as { id: string; display_name: string | null }[]).map((p) => [p.id, p.display_name])
   );
   const userAvatarMap = new Map(
-    (profilesRes.data as { id: string; avatar_url: string | null }[] | null)?.map((p) => [p.id, p.avatar_url]) || [],
+    (profilesData as { id: string; avatar_url: string | null }[]).map((p) => [p.id, p.avatar_url])
   );
 
   const enrichedRecords: StudyRecord[] = records.map((record) => ({
