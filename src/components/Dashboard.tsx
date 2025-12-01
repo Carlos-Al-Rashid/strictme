@@ -121,23 +121,26 @@ export default function Dashboard({
                             .from('materials')
                             .select('name, image')
                             .in('name', materialNames)
-                        : Promise.resolve({ data: [] }),
+                        : Promise.resolve({ data: [], error: null }),
                     allUserIds.length
                         ? supabase
                             .from('profiles')
                             .select('id, display_name, avatar_url')
                             .in('id', allUserIds)
-                        : Promise.resolve({ data: [] }),
+                        : Promise.resolve({ data: [], error: null }),
                 ]);
 
+                const materialsData = materialsRes.data || [];
+                const profilesData = profilesRes.data || [];
+
                 const materialImageMap = new Map(
-                    (materialsRes.data as { name: string; image: string | null }[] | null)?.map(m => [m.name, m.image]) || []
+                    (materialsData as { name: string; image: string | null }[]).map(m => [m.name, m.image])
                 );
                 const userNameMap = new Map(
-                    (profilesRes.data as { id: string; display_name: string | null }[] | null)?.map(p => [p.id, p.display_name]) || []
+                    (profilesData as { id: string; display_name: string | null }[]).map(p => [p.id, p.display_name])
                 );
                 const userAvatarMap = new Map(
-                    (profilesRes.data as { id: string; avatar_url: string | null }[] | null)?.map(p => [p.id, p.avatar_url]) || []
+                    (profilesData as { id: string; avatar_url: string | null }[]).map(p => [p.id, p.avatar_url])
                 );
 
                 const enrichedRecords = recordsData.map(record => ({
@@ -218,21 +221,19 @@ export default function Dashboard({
                 <div className="flex border-b border-gray-200">
                     <button
                         onClick={() => setActiveTab("follow")}
-                        className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${
-                            activeTab === "follow"
+                        className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${activeTab === "follow"
                                 ? "text-blue-500 border-b-2 border-blue-500"
                                 : "text-gray-500 hover:text-gray-700"
-                        }`}
+                            }`}
                     >
                         フォロー
                     </button>
                     <button
                         onClick={() => setActiveTab("goals")}
-                        className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${
-                            activeTab === "goals"
+                        className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${activeTab === "goals"
                                 ? "text-blue-500 border-b-2 border-blue-500"
                                 : "text-gray-500 hover:text-gray-700"
-                        }`}
+                            }`}
                     >
                         目標
                     </button>
@@ -296,121 +297,121 @@ export default function Dashboard({
                     ) : (
                         // Study Records Timeline
                         records.map((record, index) => (
-                        <motion.div
-                            key={record.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`p-4 ${index !== records.length - 1 ? 'border-b border-gray-200' : ''}`}
-                        >
-                            {/* Header */}
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-start space-x-3 flex-1">
-                                    <button
-                                        onClick={() => router.push(`/users/${record.user_id}`)}
-                                        className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
-                                    >
-                                        {record.user_avatar_url ? (
-                                            <img src={record.user_avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User className="text-gray-500" size={20} />
-                                        )}
-                                    </button>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <button
-                                                onClick={() => router.push(`/users/${record.user_id}`)}
-                                                className="font-bold text-sm text-gray-900 hover:underline"
-                                            >
-                                                {record.user_display_name || "ゲスト"}
-                                            </button>
-                                            <p className="text-xs text-gray-400">
-                                                {formatDistanceToNow(new Date(record.created_at), { addSuffix: true, locale: ja })}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {currentUserId === record.user_id && (
-                                    <div className="relative ml-2">
+                            <motion.div
+                                key={record.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`p-4 ${index !== records.length - 1 ? 'border-b border-gray-200' : ''}`}
+                            >
+                                {/* Header */}
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-start space-x-3 flex-1">
                                         <button
-                                            onClick={() => toggleMenu(record.id)}
-                                            className="text-gray-400 hover:text-gray-600"
+                                            onClick={() => router.push(`/users/${record.user_id}`)}
+                                            className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
                                         >
-                                            <MoreHorizontal size={20} />
+                                            {record.user_avatar_url ? (
+                                                <img src={record.user_avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User className="text-gray-500" size={20} />
+                                            )}
                                         </button>
-                                        {showMenu[record.id] && (
-                                            <>
-                                                <div
-                                                    className="fixed inset-0 z-10"
-                                                    onClick={() => toggleMenu(record.id)}
-                                                />
-                                                <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-32 z-20">
-                                                    <button
-                                                        onClick={() => {
-                                                            toggleMenu(record.id);
-                                                            handleDeleteRecord(record.id);
-                                                        }}
-                                                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                                    >
-                                                        削除
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Content */}
-                            <div className="pl-13">
-                                <button
-                                    onClick={() => router.push(`/records/${record.id}`)}
-                                    className="w-full text-left bg-gray-50 p-4 rounded-lg flex items-start space-x-4 hover:bg-gray-100 transition-colors"
-                                >
-                                    {/* Material Image */}
-                                    <div className="w-16 h-20 bg-blue-100 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                        {record.material_image ? (
-                                            <img
-                                                src={record.material_image}
-                                                alt={record.subject}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <span className="text-blue-500 font-bold text-xs">NO IMAGE</span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-800 text-sm mb-1">{record.subject}</h3>
-                                        <div className="flex items-baseline space-x-1">
-                                            <span className="text-2xl font-bold text-gray-900">
-                                                {Math.floor(record.duration / 60) > 0 ? `${Math.floor(record.duration / 60)}時間` : ""}
-                                                {record.duration % 60}分
-                                            </span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <button
+                                                    onClick={() => router.push(`/users/${record.user_id}`)}
+                                                    className="font-bold text-sm text-gray-900 hover:underline"
+                                                >
+                                                    {record.user_display_name || "ゲスト"}
+                                                </button>
+                                                <p className="text-xs text-gray-400">
+                                                    {formatDistanceToNow(new Date(record.created_at), { addSuffix: true, locale: ja })}
+                                                </p>
+                                            </div>
                                         </div>
-                                        {record.notes && (
-                                            <p className="text-sm text-gray-600 mt-2 bg-white p-2 rounded border border-gray-100">
-                                                {record.notes}
-                                            </p>
-                                        )}
                                     </div>
-                                </button>
-                            </div>
+                                    {currentUserId === record.user_id && (
+                                        <div className="relative ml-2">
+                                            <button
+                                                onClick={() => toggleMenu(record.id)}
+                                                className="text-gray-400 hover:text-gray-600"
+                                            >
+                                                <MoreHorizontal size={20} />
+                                            </button>
+                                            {showMenu[record.id] && (
+                                                <>
+                                                    <div
+                                                        className="fixed inset-0 z-10"
+                                                        onClick={() => toggleMenu(record.id)}
+                                                    />
+                                                    <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-gray-200 py-1 w-32 z-20">
+                                                        <button
+                                                            onClick={() => {
+                                                                toggleMenu(record.id);
+                                                                handleDeleteRecord(record.id);
+                                                            }}
+                                                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                                        >
+                                                            削除
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Footer Actions */}
-                            <div className="flex items-center space-x-6 text-gray-500 text-sm pl-13 mt-3">
-                                <button
-                                    onClick={() => router.push(`/records/${record.id}`)}
-                                    className="flex items-center space-x-1 hover:text-gray-800 transition-colors"
-                                >
-                                    <MessageSquare size={18} />
-                                    <span>{comments[record.id]?.length || 0}</span>
-                                </button>
-                                <button className="flex items-center space-x-1 hover:text-blue-500 transition-colors">
-                                    <ThumbsUp size={18} />
-                                    <span>いいね！</span>
-                                </button>
-                            </div>
-                        </motion.div>
-                    )))}
+                                {/* Content */}
+                                <div className="pl-13">
+                                    <button
+                                        onClick={() => router.push(`/records/${record.id}`)}
+                                        className="w-full text-left bg-gray-50 p-4 rounded-lg flex items-start space-x-4 hover:bg-gray-100 transition-colors"
+                                    >
+                                        {/* Material Image */}
+                                        <div className="w-16 h-20 bg-blue-100 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                            {record.material_image ? (
+                                                <img
+                                                    src={record.material_image}
+                                                    alt={record.subject}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <span className="text-blue-500 font-bold text-xs">NO IMAGE</span>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-800 text-sm mb-1">{record.subject}</h3>
+                                            <div className="flex items-baseline space-x-1">
+                                                <span className="text-2xl font-bold text-gray-900">
+                                                    {Math.floor(record.duration / 60) > 0 ? `${Math.floor(record.duration / 60)}時間` : ""}
+                                                    {record.duration % 60}分
+                                                </span>
+                                            </div>
+                                            {record.notes && (
+                                                <p className="text-sm text-gray-600 mt-2 bg-white p-2 rounded border border-gray-100">
+                                                    {record.notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {/* Footer Actions */}
+                                <div className="flex items-center space-x-6 text-gray-500 text-sm pl-13 mt-3">
+                                    <button
+                                        onClick={() => router.push(`/records/${record.id}`)}
+                                        className="flex items-center space-x-1 hover:text-gray-800 transition-colors"
+                                    >
+                                        <MessageSquare size={18} />
+                                        <span>{comments[record.id]?.length || 0}</span>
+                                    </button>
+                                    <button className="flex items-center space-x-1 hover:text-blue-500 transition-colors">
+                                        <ThumbsUp size={18} />
+                                        <span>いいね！</span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )))}
 
                     {activeTab === "follow" && records.length === 0 && (
                         <div className="text-center py-12 text-gray-400">
