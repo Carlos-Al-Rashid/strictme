@@ -95,12 +95,12 @@ export default function Dashboard({
                     .select('following_id')
                     .eq('follower_id', user.id),
                 supabase
-                    .from('study_records')
+                    .from('study_records_with_details')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(50),
                 supabase
-                    .from('goals')
+                    .from('goals_with_details')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(20),
@@ -110,55 +110,14 @@ export default function Dashboard({
             setFollowingIds(followingUserIds);
 
             if (recordsData) {
-                const materialNames = [...new Set(recordsData.map(r => r.subject))];
-                const recordUserIds = [...new Set(recordsData.map(r => r.user_id))];
-                const goalUserIds = [...new Set((goalsData || []).map(g => g.user_id))];
-                const allUserIds = [...new Set([...recordUserIds, ...goalUserIds])];
-
-                const [materialsRes, profilesRes] = await Promise.all([
-                    materialNames.length
-                        ? supabase
-                            .from('materials')
-                            .select('name, image')
-                            .in('name', materialNames)
-                        : Promise.resolve({ data: [], error: null }),
-                    allUserIds.length
-                        ? supabase
-                            .from('profiles')
-                            .select('id, display_name, avatar_url')
-                            .in('id', allUserIds)
-                        : Promise.resolve({ data: [], error: null }),
-                ]);
-
-                const materialsData = materialsRes.data || [];
-                const profilesData = profilesRes.data || [];
-
-                const materialImageMap = new Map(
-                    (materialsData as { name: string; image: string | null }[]).map(m => [m.name, m.image])
-                );
-                const userNameMap = new Map(
-                    (profilesData as { id: string; display_name: string | null }[]).map(p => [p.id, p.display_name])
-                );
-                const userAvatarMap = new Map(
-                    (profilesData as { id: string; avatar_url: string | null }[]).map(p => [p.id, p.avatar_url])
-                );
-
-                const enrichedRecords = recordsData.map(record => ({
-                    ...record,
-                    material_image: materialImageMap.get(record.subject) || null,
-                    user_display_name: userNameMap.get(record.user_id) || null,
-                    user_avatar_url: userAvatarMap.get(record.user_id) || null
-                }));
-
+                // View returns data already enriched, just cast to StudyRecord
+                const enrichedRecords = recordsData as StudyRecord[];
                 setAllRecords(enrichedRecords);
                 setRecords(enrichedRecords);
+            }
 
-                const enrichedGoals = (goalsData || []).map(goal => ({
-                    ...goal,
-                    user_display_name: userNameMap.get(goal.user_id) || null,
-                    user_avatar_url: userAvatarMap.get(goal.user_id) || null
-                }));
-
+            if (goalsData) {
+                const enrichedGoals = goalsData as Goal[];
                 setGoals(enrichedGoals);
             }
 
@@ -222,8 +181,8 @@ export default function Dashboard({
                     <button
                         onClick={() => setActiveTab("follow")}
                         className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${activeTab === "follow"
-                                ? "text-blue-500 border-b-2 border-blue-500"
-                                : "text-gray-500 hover:text-gray-700"
+                            ? "text-blue-500 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
                             }`}
                     >
                         フォロー
@@ -231,8 +190,8 @@ export default function Dashboard({
                     <button
                         onClick={() => setActiveTab("goals")}
                         className={`flex-1 py-4 text-center text-sm font-medium transition-colors ${activeTab === "goals"
-                                ? "text-blue-500 border-b-2 border-blue-500"
-                                : "text-gray-500 hover:text-gray-700"
+                            ? "text-blue-500 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
                             }`}
                     >
                         目標
